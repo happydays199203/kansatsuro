@@ -173,11 +173,11 @@
   </nav>
 
   <dialog id="observationDialog" class="dialog">
-    <form id="observationForm" method="dialog">
+    <form id="observationForm">
       <div class="dialog-head">
         <button type="button" class="text-btn" id="cancelObservation">キャンセル</button>
         <h3>新しい観察を記録</h3>
-        <button type="submit" class="text-btn save-btn">保存</button>
+        <button type="submit" class="text-btn save-btn" id="saveObservationBtn">保存</button>
       </div>
 
       <label class="image-drop" for="photoInput" id="photoPreview">
@@ -210,6 +210,7 @@
       <label>タグ<input id="tagsInput" placeholder="トマト, 水やり, 元気がない" /></label>
 
       <label class="checkbox-row"><input id="statusInput" type="checkbox" /> 要確認にする</label>
+      <p id="saveError" class="form-error" aria-live="polite"></p>
       <input type="hidden" id="photoUrlInput" />
     </form>
   </dialog>
