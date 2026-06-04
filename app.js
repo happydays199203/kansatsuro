@@ -17,7 +17,7 @@ const sampleObservations = [
 
 let observations = [], workspaces = [], currentWorkspace = null, currentUser = null, currentProfile = null;
 let sortDesc = true, selectedPhotoFile = null, selectedPhotoDataUrl = '', authMode = 'signin';
-let pendingJoinCode = new URLSearchParams(location.search).get('join') || '';
+let pendingJoinCode = ''; // 共有設定画面を使わないため、参加コードは使いません。
 
 const $ = id => document.getElementById(id);
 const els = {
@@ -102,19 +102,29 @@ async function joinWorkspace(code){
   pendingJoinCode=''; const u=new URL(location.href); u.searchParams.delete('join'); history.replaceState({},'',u.toString()); renderWorkspace(); await loadObservations(); return currentWorkspace;
 }
 async function setupWorkspace(){
-  if(!SUPABASE_READY){ currentWorkspace={id:'local',name:'ローカル観察',invite_code:'local'}; renderWorkspace(); return; }
-  await fetchWorkspaces(); if(pendingJoinCode) await joinWorkspace(pendingJoinCode);
-  if(!workspaces.length) await createWorkspace(CONFIG.DEFAULT_WORKSPACE_NAME||'観察チーム');
-  else { const saved=localStorage.getItem('kansatsuro_workspace_id'); currentWorkspace=workspaces.find(w=>w.id===saved)||workspaces[0]; localStorage.setItem('kansatsuro_workspace_id',currentWorkspace.id); }
+  if(!SUPABASE_READY){
+    currentWorkspace={id:'local',name:'ローカル観察',invite_code:'local'};
+    renderWorkspace();
+    return;
+  }
+
+  // v4: 共有・設定画面を使わず、ログインした全員を同じ共有スペースへ自動参加させます。
+  const {data,error}=await db.rpc('get_or_create_default_workspace');
+  if(error){
+    console.warn(error);
+    alert('共有スペースの準備に失敗しました。Supabaseで supabase-global-workspace-patch.sql を実行してください。');
+    await fetchWorkspaces();
+    if(!workspaces.length) await createWorkspace(CONFIG.DEFAULT_WORKSPACE_NAME||'観察チーム');
+    else currentWorkspace=workspaces[0];
+  }else{
+    currentWorkspace=Array.isArray(data)?data[0]:data;
+    workspaces=currentWorkspace?[currentWorkspace]:[];
+  }
+  if(currentWorkspace?.id) localStorage.setItem('kansatsuro_workspace_id',currentWorkspace.id);
   renderWorkspace();
 }
-function shareUrl(w=currentWorkspace){ if(!w?.invite_code) return ''; const base=CONFIG.SHARE_BASE_URL || location.origin+location.pathname; const u=new URL(base, location.href); u.searchParams.set('join',w.invite_code); return u.toString(); }
 function renderWorkspace(){
-  els.workspaceChip.textContent=currentWorkspace?.name||'観察チーム';
-  els.workspaceSelect.innerHTML=workspaces.map(w=>`<option value="${html(w.id)}">${html(w.name)}</option>`).join('');
-  if(currentWorkspace?.id) els.workspaceSelect.value=currentWorkspace.id;
-  els.inviteCodeText.textContent=currentWorkspace?.invite_code||'未設定'; els.inviteUrlInput.value=shareUrl();
-  els.supabaseModeHint.textContent=SUPABASE_READY?'この共有コードを渡すと、相手は自分のアカウントで同じ観察チームに参加できます。':'現在はローカル保存です。Supabase設定後にアカウント作成と共有が使えます。';
+  if(els.workspaceChip) els.workspaceChip.textContent=currentWorkspace?.name||'観察チーム';
 }
 async function loadObservations(){
   if(!SUPABASE_READY){ observations=localData(); render(); return; }
@@ -155,9 +165,6 @@ function initEvents(){
   $('newObservationBtn').onclick=()=>{resetForm(); els.dialog.showModal();}; $('mobileNewBtn').onclick=()=>{resetForm(); els.dialog.showModal();}; $('cancelObservation').onclick=()=>els.dialog.close();
   $('sortBtn').onclick=e=>{sortDesc=!sortDesc; e.currentTarget.textContent=sortDesc?'新しい順 ↓':'古い順 ↑'; render();}; [els.searchInput,els.categoryFilter,els.locationFilter].forEach(x=>x.addEventListener('input',render)); els.form.addEventListener('submit',handleSubmit);
   els.photoInput.onchange=e=>{ const f=e.target.files?.[0]; selectedPhotoFile=f||null; if(!f) return; const r=new FileReader(); r.onload=()=>{selectedPhotoDataUrl=r.result; els.photoPreview.classList.add('has-image'); els.photoPreview.style.backgroundImage=`url(${selectedPhotoDataUrl})`;}; r.readAsDataURL(f); };
-  $('openSettings').onclick=()=>{els.nameSetting.value=getUserName(); renderWorkspace(); els.settingsDialog.showModal();}; els.workspaceChip.onclick=()=>$('openSettings').click(); $('closeSettings').onclick=()=>els.settingsDialog.close(); $('saveSettings').onclick=async()=>{await updateProfileName(els.nameSetting.value.trim()); alert('表示名を保存しました。');};
-  els.workspaceSelect.onchange=async e=>{currentWorkspace=workspaces.find(w=>w.id===e.target.value)||currentWorkspace; localStorage.setItem('kansatsuro_workspace_id',currentWorkspace.id); renderWorkspace(); await loadObservations();};
-  els.copyInviteBtn.onclick=()=>copyText(currentWorkspace?.invite_code||'','共有コードをコピーしました。'); els.copyShareUrlBtn.onclick=()=>copyText(shareUrl(),'参加URLをコピーしました。'); els.joinWorkspaceBtn.onclick=async()=>{const w=await joinWorkspace(els.joinCodeInput.value); if(w) alert('共有チームに参加しました。');}; els.createWorkspaceBtn.onclick=async()=>{const w=await createWorkspace(els.newWorkspaceName.value); if(w){els.newWorkspaceName.value=''; alert('新しい共有チームを作成しました。'); await loadObservations();}};
 }
 async function subscribeRealtime(){ if(!SUPABASE_READY) return; db.channel('observations-realtime').on('postgres_changes',{event:'*',schema:'public',table:'observations'},p=>{ if(p.new?.workspace_id===currentWorkspace?.id||p.old?.workspace_id===currentWorkspace?.id) loadObservations(); }).subscribe(); }
 async function bootSupabase(){ const {data}=await db.auth.getSession(); currentUser=data.session?.user||null; if(!currentUser){ setAuthMode('signin'); showAuth(); return; } showApp(); els.signOutBtn.hidden=false; await ensureProfile(); await setupWorkspace(); await loadObservations(); }
