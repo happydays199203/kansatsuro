@@ -448,3 +448,16 @@ textarea { min-height: 80px; resize: vertical; }
 
 /* v4: 共有・設定画面は使わない */
 #openSettings, #settingsDialog, #workspaceChip { display: none !important; }
+
+/* v6: 保存エラーを画面内に表示 */
+.form-error {
+  margin: 8px 0 0;
+  min-height: 20px;
+  color: #b42318;
+  font-weight: 700;
+  font-size: 13px;
+}
+.save-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
