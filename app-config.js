@@ -4,5 +4,5 @@ window.KANSATSURO_CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable_EeBKRIvhTCJGf9tYAikAaw_kcelxCZO",
   STORAGE_BUCKET: "observation-photos",
   DEFAULT_WORKSPACE_NAME: "観察チーム",
-  SHARE_BASE_URL: ""
+  SHARE_BASE_URL: "https://kansatsuro.vercel.app/"
 };
