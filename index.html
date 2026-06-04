@@ -24,7 +24,7 @@
         <button class="primary-cta full" id="authSubmit" type="submit">ログイン</button>
       </form>
       <p class="auth-message" id="authMessage"></p>
-      <p class="hint">共有コードを渡すと、他の人も自分のアカウントで同じ観察チームに参加できます。</p>
+      <p class="hint">アカウント作成後、同じ観察記録をチームで見返せます。</p>
     </div>
   </section>
 
@@ -47,7 +47,6 @@
       </nav>
 
       <div class="side-divider"></div>
-      <button class="nav-item muted" id="openSettings"><span>⚙</span>共有・設定</button>
       <button class="nav-item muted" id="signOutBtn" hidden><span>↪</span>ログアウト</button>
 
       <div class="grass-ornament" aria-hidden="true"></div>
@@ -60,7 +59,6 @@
           <p id="pageSubTitle">今の状態を見て、必要な確認だけ拾う</p>
         </div>
         <div class="topbar-right">
-          <button class="workspace-chip" id="workspaceChip" type="button">観察チーム</button>
           <div class="weather-pill">☀️ <span id="currentWeather">晴れ 18℃</span></div>
           <button class="icon-btn" aria-label="通知">🔔</button>
           <div class="user-chip"><span>🌿</span><strong id="userDisplayName">観察太郎</strong></div>
@@ -217,48 +215,7 @@
     </form>
   </dialog>
 
-  <dialog id="settingsDialog" class="dialog small-dialog">
-    <form method="dialog">
-      <div class="dialog-head">
-        <button type="button" class="text-btn" id="closeSettings">閉じる</button>
-        <h3>共有・設定</h3>
-        <span></span>
-      </div>
-      <section class="settings-block">
-        <h4>表示名</h4>
-        <label>表示名<input id="nameSetting" placeholder="観察太郎" /></label>
-        <button class="primary-cta full small" id="saveSettings" type="button">表示名を保存</button>
-      </section>
-      <section class="settings-block">
-        <h4>共有チーム</h4>
-        <p class="hint" id="supabaseModeHint">Supabase設定後、共有コードと参加URLが表示されます。</p>
-        <label>現在のチーム<select id="workspaceSelect"></select></label>
-        <div class="share-box"><span>共有コード</span><strong id="inviteCodeText">未設定</strong><button class="text-btn" type="button" id="copyInviteBtn">コピー</button></div>
-        <label>参加用URL<input id="inviteUrlInput" readonly /></label>
-        <button class="primary-cta full small" type="button" id="copyShareUrlBtn">参加URLをコピー</button>
-      </section>
-      <section class="settings-block">
-        <h4>別チームに参加</h4>
-        <label>共有コード<input id="joinCodeInput" placeholder="例：a1b2c3d4e5" /></label>
-        <button class="primary-cta full small" type="button" id="joinWorkspaceBtn">共有チームに参加</button>
-      </section>
-      <section class="settings-block">
-        <h4>新しいチームを作る</h4>
-        <label>チーム名<input id="newWorkspaceName" placeholder="例：第一畑チーム" /></label>
-        <button class="primary-cta full small" type="button" id="createWorkspaceBtn">チームを作成</button>
-      </section>
-    </form>
-  </dialog>
 
-  <template id="rowTemplate">
-    <article class="observation-row">
-      <img class="thumb" alt="観察写真" />
-      <div class="row-date"><strong></strong><span></span><small></small></div>
-      <div class="row-main"><h4></h4><div class="row-meta"></div><p></p></div>
-      <div class="row-tags"></div>
-      <button class="row-arrow" aria-label="詳細を見る">›</button>
-    </article>
-  </template>
 
   <script src="./app.js"></script>
 </body>
