@@ -156,8 +156,121 @@ function renderSummary(){ const plants=observations.filter(o=>['苗','植物・�
 function render(){ const d=filtered(); renderStatus(); renderHero(d); renderRows(d); renderDashboard(); renderLibrary(); renderQuestions(); renderSummary(); }
 function switchView(view){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); $(`view-${view}`)?.classList.add('active'); document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view)); const names={dashboard:['ダッシュボード','今日の確認を一箇所にまとめる'],list:['観察一覧','今の状態を見て、必要な確認だけ拾う'],library:['図鑑','同じ植物・虫・土の記録を束ねて見る'],questions:['質問リスト','師匠に聞くことを逃さない'],summary:['まとめ・振り返り','観察を学びに変える']}; els.pageTitle.textContent=names[view]?.[0]||'観察一覧'; els.pageSubTitle.textContent=names[view]?.[1]||''; }
 function resetForm(){ els.form.reset(); selectedPhotoFile=null; selectedPhotoDataUrl=''; els.photoPreview.classList.remove('has-image'); els.photoPreview.style.backgroundImage=''; const n=new Date(); n.setMinutes(n.getMinutes()-n.getTimezoneOffset()); $('dateInput').value=n.toISOString().slice(0,16); $('weatherInput').value='晴れ'; $('tempInput').value='18'; }
-async function uploadPhoto(file){ if(!file) return imageAssets.leaf; if(!SUPABASE_READY) return selectedPhotoDataUrl||imageAssets.leaf; const ext=file.name.split('.').pop()||'jpg', path=`${currentWorkspace?.id||'no-workspace'}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`; const {error}=await db.storage.from(CONFIG.STORAGE_BUCKET||'observation-photos').upload(path,file,{cacheControl:'3600'}); if(error){ console.warn(error); return selectedPhotoDataUrl||imageAssets.leaf; } return db.storage.from(CONFIG.STORAGE_BUCKET||'observation-photos').getPublicUrl(path).data.publicUrl; }
-async function handleSubmit(e){ e.preventDefault(); const image_url=await uploadPhoto(selectedPhotoFile); const item={title:$('titleInput').value.trim(),category:$('catInput').value,status:$('statusInput').checked?'needs_check':'ok',image_url,observed_at:new Date($('dateInput').value).toISOString(),location:$('placeInput').value.trim(),weather:$('weatherInput').value.trim()||'晴れ',temperature:Number($('tempInput').value||18),memo:$('memoInput').value.trim(),hypothesis:$('hypothesisInput').value.trim(),question:$('questionInput').value.trim(),tags:tags($('tagsInput').value),owner_name:getUserName()}; if(SUPABASE_READY){ const {error}=await db.from('observations').insert({...item,workspace_id:currentWorkspace.id,user_id:currentUser.id}); if(error){ alert('保存に失敗しました。'); console.warn(error); return; } await loadObservations(); } else { observations.unshift({...item,id:`local-${Date.now()}`}); saveLocal(); render(); } els.dialog.close(); }
+async function uploadPhoto(file){
+  // 写真アップロードに失敗しても、投稿自体は保存できるようにする。
+  // 以前の版ではアップロード失敗時にbase64画像をDBへ入れようとして、保存失敗の原因になることがありました。
+  if(!file) return imageAssets.leaf;
+  if(!SUPABASE_READY) return selectedPhotoDataUrl || imageAssets.leaf;
+  try{
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+    const path=`${currentWorkspace?.id||'no-workspace'}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+    const {error}=await db.storage.from(CONFIG.STORAGE_BUCKET||'observation-photos').upload(path,file,{cacheControl:'3600', upsert:false});
+    if(error){
+      console.warn('photo upload failed:', error);
+      alert(`写真アップロードに失敗しましたが、記録は写真なしで保存します。\n${error.message || ''}`);
+      return imageAssets.leaf;
+    }
+    return db.storage.from(CONFIG.STORAGE_BUCKET||'observation-photos').getPublicUrl(path).data.publicUrl;
+  }catch(err){
+    console.warn('photo upload exception:', err);
+    return imageAssets.leaf;
+  }
+}
+function setSaveError(message){
+  const el = $('saveError');
+  if(el) el.textContent = message || '';
+}
+async function handleSubmit(e){
+  e.preventDefault();
+  setSaveError('');
+  const saveBtn = $('saveObservationBtn');
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
+  try{
+    const title = $('titleInput').value.trim();
+    if(!title){
+      setSaveError('タイトルを入力してください。');
+      $('titleInput').focus();
+      return;
+    }
+    const dateValue = $('dateInput').value;
+    if(!dateValue){
+      setSaveError('日付を入力してください。');
+      $('dateInput').focus();
+      return;
+    }
+    if(SUPABASE_READY){
+      if(!currentUser){
+        setSaveError('ログイン状態が切れています。もう一度ログインしてください。');
+        return;
+      }
+      if(!currentWorkspace?.id){
+        await setupWorkspace();
+        if(!currentWorkspace?.id){
+          setSaveError('共有チームの準備ができていません。SQLパッチを実行してください。');
+          return;
+        }
+      }
+    }
+
+    const image_url=await uploadPhoto(selectedPhotoFile);
+    const item={
+      title,
+      category:$('catInput').value,
+      status:$('statusInput').checked?'needs_check':'ok',
+      image_url,
+      observed_at:new Date(dateValue).toISOString(),
+      location:$('placeInput').value.trim(),
+      weather:$('weatherInput').value.trim()||'晴れ',
+      temperature:Number($('tempInput').value||18),
+      memo:$('memoInput').value.trim(),
+      hypothesis:$('hypothesisInput').value.trim(),
+      question:$('questionInput').value.trim(),
+      tags:tags($('tagsInput').value),
+      owner_name:getUserName()
+    };
+
+    if(SUPABASE_READY){
+      const rpcArgs = {
+        p_workspace_id: currentWorkspace.id,
+        p_title: item.title,
+        p_category: item.category,
+        p_status: item.status,
+        p_image_url: item.image_url,
+        p_observed_at: item.observed_at,
+        p_location: item.location,
+        p_weather: item.weather,
+        p_temperature: item.temperature,
+        p_memo: item.memo,
+        p_hypothesis: item.hypothesis,
+        p_question: item.question,
+        p_tags: item.tags,
+        p_owner_name: item.owner_name
+      };
+      let {error} = await db.rpc('create_observation', rpcArgs);
+      if(error && String(error.message||'').includes('Could not find the function')){
+        const fallback = await db.from('observations').insert({...item,workspace_id:currentWorkspace.id,user_id:currentUser.id}).select('id').single();
+        error = fallback.error;
+      }
+      if(error){
+        console.warn('observation save failed:', error, rpcArgs);
+        setSaveError(`保存に失敗しました：${error.message || 'Supabaseの権限設定を確認してください。'}`);
+        return;
+      }
+      await loadObservations();
+    } else {
+      observations.unshift({...item,id:`local-${Date.now()}`});
+      saveLocal();
+      render();
+    }
+    els.dialog.close();
+  }catch(err){
+    console.error('save exception:', err);
+    setSaveError(`保存処理でエラーが出ました：${err.message || err}`);
+  }finally{
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = '保存'; }
+  }
+}
+
 function copyText(text,msg){ if(!text) return; navigator.clipboard?.writeText(text).then(()=>alert(msg)).catch(()=>prompt('コピーしてください', text)); }
 function initEvents(){
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
