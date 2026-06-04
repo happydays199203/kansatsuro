@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>観察録｜植物の観察記録ノート</title>
+  <meta name="description" content="畑・植物・虫・土・水やりの観察記録を共有できるWEBプラットフォーム" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./app-config.js"></script>
+</head>
+<body>
+  <section class="auth-gate" id="authGate" hidden>
+    <div class="auth-card">
+      <div class="auth-brand"><div class="brand-mark">🌿</div><div><h1>観察録</h1><p>畑で見たことを、チームで見返す。</p></div></div>
+      <div class="auth-tabs">
+        <button class="active" type="button" data-auth-mode="signin">ログイン</button>
+        <button type="button" data-auth-mode="signup">アカウント作成</button>
+      </div>
+      <form id="authForm" class="auth-form">
+        <label id="displayNameLabel">表示名<input id="authDisplayName" autocomplete="name" placeholder="例：渡邊純一" /></label>
+        <label>メールアドレス<input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com" /></label>
+        <label>パスワード<input id="authPassword" type="password" required minlength="6" autocomplete="current-password" placeholder="6文字以上" /></label>
+        <button class="primary-cta full" id="authSubmit" type="submit">ログイン</button>
+      </form>
+      <p class="auth-message" id="authMessage"></p>
+      <p class="hint">共有コードを渡すと、他の人も自分のアカウントで同じ観察チームに参加できます。</p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">🌿</div>
+        <div>
+          <h1>観察録</h1>
+          <p>植物の観察記録ノート</p>
+        </div>
+      </div>
+
+      <nav class="side-nav" aria-label="メインナビゲーション">
+        <button class="nav-item" data-view="dashboard"><span>⌂</span>ダッシュボード</button>
+        <button class="nav-item active" data-view="list"><span>🌱</span>観察一覧</button>
+        <button class="nav-item" data-view="library"><span>📖</span>図鑑</button>
+        <button class="nav-item" data-view="questions"><span>?</span>質問リスト</button>
+        <button class="nav-item" data-view="summary"><span>▤</span>まとめ・振り返り</button>
+      </nav>
+
+      <div class="side-divider"></div>
+      <button class="nav-item muted" id="openSettings"><span>⚙</span>共有・設定</button>
+      <button class="nav-item muted" id="signOutBtn" hidden><span>↪</span>ログアウト</button>
+
+      <div class="grass-ornament" aria-hidden="true"></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <h2 id="pageTitle">観察一覧</h2>
+          <p id="pageSubTitle">今の状態を見て、必要な確認だけ拾う</p>
+        </div>
+        <div class="topbar-right">
+          <button class="workspace-chip" id="workspaceChip" type="button">観察チーム</button>
+          <div class="weather-pill">☀️ <span id="currentWeather">晴れ 18℃</span></div>
+          <button class="icon-btn" aria-label="通知">🔔</button>
+          <div class="user-chip"><span>🌿</span><strong id="userDisplayName">観察太郎</strong></div>
+        </div>
+      </header>
+
+      <section class="status-row" id="statusRow">
+        <article class="status-card status-warn">
+          <div class="status-icon">⚠</div>
+          <div>
+            <p>要確認</p>
+            <strong><span id="needCheckCount">0</span>件</strong>
+          </div>
+        </article>
+
+        <article class="status-card">
+          <div class="status-icon sun">☀️</div>
+          <div>
+            <p>温度</p>
+            <strong id="temperatureCard">晴れ 18℃</strong>
+          </div>
+        </article>
+
+        <button class="primary-cta" id="newObservationBtn">＋ 新しい観察を記録</button>
+      </section>
+
+      <section class="filters" id="filters">
+        <label class="searchbox">
+          <span>⌕</span>
+          <input id="searchInput" type="search" placeholder="キーワードで検索（植物名、メモなど）" />
+        </label>
+        <select id="categoryFilter" aria-label="カテゴリ">
+          <option value="all">すべてのカテゴリ</option>
+          <option value="苗">苗</option>
+          <option value="植物・草">植物・草</option>
+          <option value="土">土</option>
+          <option value="水やり">水やり</option>
+          <option value="虫">虫</option>
+          <option value="作業">作業</option>
+          <option value="異常">異常</option>
+        </select>
+        <select id="locationFilter" aria-label="場所">
+          <option value="all">すべての場所</option>
+          <option value="第一畑">第一畑</option>
+          <option value="畑の端">畑の端</option>
+          <option value="倉庫横">倉庫横</option>
+          <option value="苗置き場">苗置き場</option>
+        </select>
+      </section>
+
+      <section class="view view-list active" id="view-list">
+        <article class="hero-observation" id="heroObservation"></article>
+
+        <div class="section-heading">
+          <h3>これまでの観察</h3>
+          <button class="text-btn" id="sortBtn">新しい順 ↓</button>
+        </div>
+        <div class="observation-list" id="observationList"></div>
+      </section>
+
+      <section class="view" id="view-dashboard">
+        <div class="simple-panel">
+          <h3>今日の確認</h3>
+          <p>要確認の記録、直近の観察、師匠に聞くことをまとめます。</p>
+          <div id="dashboardQuickList" class="compact-list"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-library">
+        <div class="library-header">
+          <h3>図鑑</h3>
+          <p>植物・虫・土・水などを種類ごとに見返します。</p>
+        </div>
+        <div class="library-grid" id="libraryGrid"></div>
+      </section>
+
+      <section class="view" id="view-questions">
+        <div class="simple-panel">
+          <h3>師匠に聞くこと</h3>
+          <p>未確認の疑問だけを集めます。</p>
+          <div id="questionList" class="question-list"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-summary">
+        <div class="summary-card">
+          <h3>今週の観察サマリー</h3>
+          <div class="summary-metrics">
+            <div><strong id="summaryTotal">0</strong><span>記録</span></div>
+            <div><strong id="summaryPlants">0</strong><span>植物</span></div>
+            <div><strong id="summaryTasks">0</strong><span>作業</span></div>
+            <div><strong id="summaryQuestions">0</strong><span>質問</span></div>
+          </div>
+          <h4>気づいたこと</h4>
+          <ul id="summaryNotes"></ul>
+          <h4>次に試すこと</h4>
+          <ul>
+            <li>要確認の苗を午前と夕方で比較する</li>
+            <li>乾きやすい場所と草の出方を見比べる</li>
+            <li>水やり後の土の表面を写真で残す</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-tabs" aria-label="モバイルナビゲーション">
+    <button data-view="list" class="active">記録</button>
+    <button data-view="library">図鑑</button>
+    <button id="mobileNewBtn">＋</button>
+    <button data-view="questions">質問</button>
+    <button data-view="summary">まとめ</button>
+  </nav>
+
+  <dialog id="observationDialog" class="dialog">
+    <form id="observationForm" method="dialog">
+      <div class="dialog-head">
+        <button type="button" class="text-btn" id="cancelObservation">キャンセル</button>
+        <h3>新しい観察を記録</h3>
+        <button type="submit" class="text-btn save-btn">保存</button>
+      </div>
+
+      <label class="image-drop" for="photoInput" id="photoPreview">
+        <input id="photoInput" type="file" accept="image/*" />
+        <span>📷 写真を追加する</span>
+      </label>
+
+      <div class="form-grid">
+        <label>タイトル<input id="titleInput" required placeholder="例：苗の様子" /></label>
+        <label>日付<input id="dateInput" type="datetime-local" required /></label>
+        <label>場所<input id="placeInput" placeholder="例：第一畑" /></label>
+        <label>温度<input id="tempInput" type="number" placeholder="18" /></label>
+        <label>天気<input id="weatherInput" placeholder="晴れ" /></label>
+        <label>カテゴリ
+          <select id="catInput">
+            <option>苗</option>
+            <option>植物・草</option>
+            <option>土</option>
+            <option>水やり</option>
+            <option>虫</option>
+            <option>作業</option>
+            <option>異常</option>
+          </select>
+        </label>
+      </div>
+
+      <label>観察メモ<textarea id="memoInput" placeholder="見たままを書く。例：苗の葉が少し下を向いている。"></textarea></label>
+      <label>気づき・仮説<textarea id="hypothesisInput" placeholder="例：水不足か、植え付けのストレスかもしれない。"></textarea></label>
+      <label>師匠に聞くこと<input id="questionInput" placeholder="例：この状態は様子見でいいですか？" /></label>
+      <label>タグ<input id="tagsInput" placeholder="トマト, 水やり, 元気がない" /></label>
+
+      <label class="checkbox-row"><input id="statusInput" type="checkbox" /> 要確認にする</label>
+      <input type="hidden" id="photoUrlInput" />
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="dialog small-dialog">
+    <form method="dialog">
+      <div class="dialog-head">
+        <button type="button" class="text-btn" id="closeSettings">閉じる</button>
+        <h3>共有・設定</h3>
+        <span></span>
+      </div>
+      <section class="settings-block">
+        <h4>表示名</h4>
+        <label>表示名<input id="nameSetting" placeholder="観察太郎" /></label>
+        <button class="primary-cta full small" id="saveSettings" type="button">表示名を保存</button>
+      </section>
+      <section class="settings-block">
+        <h4>共有チーム</h4>
+        <p class="hint" id="supabaseModeHint">Supabase設定後、共有コードと参加URLが表示されます。</p>
+        <label>現在のチーム<select id="workspaceSelect"></select></label>
+        <div class="share-box"><span>共有コード</span><strong id="inviteCodeText">未設定</strong><button class="text-btn" type="button" id="copyInviteBtn">コピー</button></div>
+        <label>参加用URL<input id="inviteUrlInput" readonly /></label>
+        <button class="primary-cta full small" type="button" id="copyShareUrlBtn">参加URLをコピー</button>
+      </section>
+      <section class="settings-block">
+        <h4>別チームに参加</h4>
+        <label>共有コード<input id="joinCodeInput" placeholder="例：a1b2c3d4e5" /></label>
+        <button class="primary-cta full small" type="button" id="joinWorkspaceBtn">共有チームに参加</button>
+      </section>
+      <section class="settings-block">
+        <h4>新しいチームを作る</h4>
+        <label>チーム名<input id="newWorkspaceName" placeholder="例：第一畑チーム" /></label>
+        <button class="primary-cta full small" type="button" id="createWorkspaceBtn">チームを作成</button>
+      </section>
+    </form>
+  </dialog>
+
+  <template id="rowTemplate">
+    <article class="observation-row">
+      <img class="thumb" alt="観察写真" />
+      <div class="row-date"><strong></strong><span></span><small></small></div>
+      <div class="row-main"><h4></h4><div class="row-meta"></div><p></p></div>
+      <div class="row-tags"></div>
+      <button class="row-arrow" aria-label="詳細を見る">›</button>
+    </article>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>
