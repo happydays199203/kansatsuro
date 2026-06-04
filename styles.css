@@ -445,3 +445,6 @@ textarea { min-height: 80px; resize: vertical; }
   .auth-card { padding: 22px; border-radius: 20px; }
   .workspace-chip { display: none; }
 }
+
+/* v4: 共有・設定画面は使わない */
+#openSettings, #settingsDialog, #workspaceChip { display: none !important; }
