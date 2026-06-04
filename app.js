@@ -39,7 +39,7 @@ function tags(v){ if(!v) return []; return Array.isArray(v) ? v.filter(Boolean).
 function dateParts(value){ const d=new Date(value); return {day:`${d.getMonth()+1}/${d.getDate()}`, weekday:`(${['日','月','火','水','木','金','土'][d.getDay()]})`, time:timeFormatter.format(d), full:`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${['日','月','火','水','木','金','土'][d.getDay()]} ${timeFormatter.format(d)}`}; }
 function tagClass(c){ return c==='土'?'cat-soil':c==='水やり'?'blue':c==='異常'?'warn':''; }
 function getUserName(){ return currentProfile?.display_name || currentUser?.user_metadata?.display_name || localStorage.getItem('kansatsuro_user_name') || '観察太郎'; }
-function setUserName(name){ localStorage.setItem('kansatsuro_user_name', name || '観察太郎'); els.userDisplayName.textContent = getUserName(); }
+function setUserName(name){ localStorage.setItem('kansatsuro_user_name', name || '観察太郎'); if (els.userDisplayName) els.userDisplayName.textContent = getUserName(); }
 function localData(){ try{ const d=JSON.parse(localStorage.getItem('kansatsuro_observations')||'null'); return Array.isArray(d)&&d.length?d:sampleObservations; }catch{ return sampleObservations; } }
 function saveLocal(){ localStorage.setItem('kansatsuro_observations', JSON.stringify(observations)); }
 function showAuth(){ els.authGate.hidden=false; els.appShell.hidden=true; document.querySelector('.mobile-tabs').style.display='none'; }
